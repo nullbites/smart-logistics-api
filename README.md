@@ -32,14 +32,15 @@ The API will expose two main sets of functionality: **Network Management** (CRUD
 
 | HTTP Method | Endpoint | Description | Body Example |
 | :--- | :--- | :--- | :--- |
-| **POST** | `/network/upload` | Uploads a new graph definition (Nodes and Edges) and return the ID of the graph. | `{"edges":[{"from":"A","to":"B","cost":10},{"from":"A","to":"C","cost":5},{"from":"B","to":"D","cost":8},{"from":"C","to":"D","cost":12},{"from":"D","to":"E","cost":12},{"from":"D","to":"F","cost":4},{"from":"F","to":"G","cost":4},{"from":"E","to":"G","cost":9},{"from":"C","to":"H","cost":8},{"from":"D","to":"H","cost":4},{"from":"F","to":"H","cost":1}]}` |
+| **POST** | `/network/upload` | Uploads a new graph definition (Nodes and Edges) and return the ID of the graph. | `{"edges":[{"from":"A","to":"B","cost":10,"maxWeight":5000,"noHazardous":true,"trafficMultiplier":1.5},{"from":"A","to":"C","cost":5}]}` |
 | **GET** | `/network/nodes/{id}` | Retrieves all defined nodes/locations from. | *None* |
 
-### 2. Route Optimization Endpoint
+### 2. Route Optimization Endpoints
 
 | HTTP Method | Endpoint | Description | Core Requirement | Body Example | Suggested Response |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **POST** | `/route/optimize/{id}` | Calculates the optimal path between two points returning the cost and the route that should be taken (e.g A -> C -> D -> E). | **Must implement the algorithm.** | `{"originNodeId": "A","destinationNodeId":"E"}` | `{"graphId":"uuid-123","totalCost":25.5,"path":["A","C","D","E"],"durationMs":4}` |
+| **POST** | `/route/optimize/{id}` | Submits an asynchronous job to calculate the optimal path, potentially through multiple waypoints. | **Must be asynchronous.** | `{"originNodeId": "A", "destinationNodeId": "E", "waypoints": ["C"], "vehicleProfile": {"type": "truck", "weight": 4000, "hazardous": false}, "departureTime": "08:00"}` | `{"jobId":"job-987"}` (Status 202 Accepted) |
+| **GET** | `/route/status/{jobId}` | Polls for the result of the asynchronous route calculation job. | **Must implement the algorithm.** | *None* | `{"status":"COMPLETED", "result":{"graphId":"uuid-123","totalCost":25.5,"path":["A","C","D","E"],"durationMs":4}}` |
 | **GET** | `/docs` | Serves the generated **Swagger UI**. | **Must be auto-generated.** | *None* | *None* |
 
 ## 🧠 The Core Algorithm Challenge
@@ -48,6 +49,10 @@ The primary challenge lies in implementing the logic for the `/route/optimize` e
 
 ### Algorithm Requirement
 The backend service must implement **Dijkstra's Algorithm** or **A\* Search** to find the shortest path between the `originNodeId` and the `destinationNodeId`.
+If `waypoints` are provided, the algorithm must calculate the optimal path visiting each waypoint in the specified order (Multi-Stop Routing).
+
+### Asynchronous Processing
+Route optimization calculations can be resource-intensive. The `/route/optimize` endpoint must not block. It should return a `jobId` immediately (HTTP 202 Accepted), and the client will poll the `/route/status/{jobId}` endpoint to retrieve the calculated route once it is `COMPLETED`.
 
 
 
@@ -56,11 +61,12 @@ The backend service must implement **Dijkstra's Algorithm** or **A\* Search** to
 
 
 ### Complex Scenarios
-The algorithm must be able to handle request bodies that include dynamic constraints:
+The algorithm must be able to handle request bodies that include dynamic constraints and advanced routing logic:
 
-1.  **Preference Switching:** The endpoint must accept a `preference` (e.g., `"shortest"`, `"fastest"`) and change the weight used in the calculation accordingly (e.g., using distance cost vs. time cost).
-2.  **Constraint Filtering:** If the request specifies `constraints: { "avoidHighways": true }`, the algorithm must **temporarily ignore** or assign infinite cost to any edge tagged as a "highway," forcing a compliant, potentially longer route.
-3.  **Error Handling:** Gracefully handle cases where the destination is unreachable or the input nodes are invalid (return `404 Not Found` or `400 Bad Request`).
+1.  **Vehicle Profiles & Constraints:** The request specifies a `vehicleProfile` (e.g., `weight: 4000`, `hazardous: true`). The graph edges define restrictions (e.g., `maxWeight: 5000`, `noHazardous: true`). Edges that cannot be traversed by the vehicle must be dynamically filtered out of the pathfinding calculation.
+2.  **Time-Dependent Edge Weights:** Instead of static costs, edge costs should be influenced by the `departureTime`. For example, applying a `trafficMultiplier` defined on the edge during "peak hours" (e.g., applying a 1.5x penalty if departing between 07:00-09:00 or 17:00-19:00). The algorithm must account for this dynamically.
+3.  **Multi-Stop Routing (TSP Variant):** If the request includes `waypoints`, the route must sequentially visit the `originNodeId`, all `waypoints` in the specified array order, and finally the `destinationNodeId`.
+4.  **Error Handling:** Gracefully handle cases where the destination is unreachable, the input nodes are invalid, or constraints make the route impossible (return an appropriate error status in the job result).
 
 That's a very common and professional way to handle a take-home project! It sets a clear, modern workflow expectation.
 
