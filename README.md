@@ -68,9 +68,37 @@ The algorithm must be able to handle request bodies that include dynamic constra
 3.  **Multi-Stop Routing (TSP Variant):** If the request includes `waypoints`, the route must sequentially visit the `originNodeId`, all `waypoints` in the specified array order, and finally the `destinationNodeId`.
 4.  **Error Handling:** Gracefully handle cases where the destination is unreachable, the input nodes are invalid, or constraints make the route impossible (return an appropriate error status in the job result).
 
-That's a very common and professional way to handle a take-home project! It sets a clear, modern workflow expectation.
+## 🧪 Validation Example
 
-Here is the updated section to insert into the **Submission Checklist** of the `README.md` for the **Smart Logistics Routing API** (Project C).
+To help candidates validate their implementation, here is a small test graph and expected outcomes.
+
+**Upload Graph Payload:**
+```json
+{
+  "edges": [
+    { "from": "A", "to": "B", "cost": 10, "maxWeight": 10000, "noHazardous": false, "trafficMultiplier": 1.0 },
+    { "from": "A", "to": "C", "cost": 15, "maxWeight": 5000, "noHazardous": true, "trafficMultiplier": 1.5 },
+    { "from": "B", "to": "D", "cost": 12, "maxWeight": 10000, "noHazardous": false, "trafficMultiplier": 2.0 },
+    { "from": "C", "to": "D", "cost": 5, "maxWeight": 5000, "noHazardous": true, "trafficMultiplier": 1.0 },
+    { "from": "D", "to": "E", "cost": 10, "maxWeight": 8000, "noHazardous": false, "trafficMultiplier": 1.2 }
+  ]
+}
+```
+
+**Test Case 1 (Standard Path):**
+- **Request:** `{"originNodeId": "A", "destinationNodeId": "E", "vehicleProfile": {"type": "van", "weight": 3000, "hazardous": false}, "departureTime": "12:00"}`
+- **Expected Route:** A -> C -> D -> E
+- **Explanation:** Vehicle is light and non-hazardous. The cost is `A->C` (15) + `C->D` (5) + `D->E` (10) = 30. (The path via B would cost 10 + 12 + 10 = 32).
+
+**Test Case 2 (Weight Constraint):**
+- **Request:** `{"originNodeId": "A", "destinationNodeId": "E", "vehicleProfile": {"type": "truck", "weight": 6000, "hazardous": false}, "departureTime": "12:00"}`
+- **Expected Route:** A -> B -> D -> E
+- **Explanation:** The truck exceeds the `5000` max weight limit on edges `A->C` and `C->D`, forcing it to take the path through B.
+
+**Test Case 3 (Hazardous Constraint):**
+- **Request:** `{"originNodeId": "A", "destinationNodeId": "E", "vehicleProfile": {"type": "truck", "weight": 3000, "hazardous": true}, "departureTime": "12:00"}`
+- **Expected Route:** A -> B -> D -> E
+- **Explanation:** The vehicle carries hazardous materials, so it cannot use `A->C` or `C->D` (`noHazardous: true`).
 
 ---
 
