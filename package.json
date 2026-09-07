@@ -26,6 +26,7 @@
     "test:unit": "jest --selectProjects unit",
     "test:integration": "jest --selectProjects integration --runInBand",
     "typecheck": "tsc --noEmit",
+    "typecheck:seed": "tsc -p tsconfig.seed.json",
     "lint": "eslint .",
     "format": "prettier --write .",
     "db:up": "docker compose up -d db",
