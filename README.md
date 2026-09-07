@@ -329,7 +329,10 @@ example. Then:
   Docker).
 
 The `Makefile` collects the same tasks (`make dev`, `make test`, `make package`,
-`make docker-build`, and so on). The `examples/` directory holds the validation
-graph (`network.json`) and matching optimization requests
-(`optimize-standard.json`, `optimize-weight.json`, `optimize-hazardous.json`)
-for a quick manual check against a running service.
+`make docker-build`, and so on).
+
+The `examples/` directory holds request payloads for checking a running service
+by hand, plus two scenario networks (`network-1-freight-corridor.json`,
+`network-2-island-grid.json`) that each bundle a graph and five route
+optimizations with their expected outcomes, and `run.mjs`, which uploads them,
+submits every optimization, and asserts the result. See `examples/README.md`.

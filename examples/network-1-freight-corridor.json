@@ -1,0 +1,168 @@
+{
+  "name": "Regional freight corridor",
+  "summary": "Six nodes with coordinates (so the network gets a heuristic scale) and the default peak windows (07:00-09:00, 17:00-19:00). A cheap highway shortcut X->Z is capped at 4000 kg, bans hazardous loads, and carries a heavy peak penalty; two longer bypasses (via Y and via P) have no such limits.",
+  "upload": {
+    "nodes": [
+      { "key": "W", "x": 0, "y": 0 },
+      { "key": "X", "x": 10, "y": 0 },
+      { "key": "Y", "x": 5, "y": 8 },
+      { "key": "Z", "x": 20, "y": 0 },
+      { "key": "P", "x": 15, "y": -8 },
+      { "key": "Q", "x": 25, "y": 5 }
+    ],
+    "edges": [
+      {
+        "from": "W",
+        "to": "X",
+        "cost": 10,
+        "maxWeight": 8000,
+        "noHazardous": false,
+        "trafficMultiplier": 1.0
+      },
+      {
+        "from": "X",
+        "to": "Z",
+        "cost": 8,
+        "maxWeight": 4000,
+        "noHazardous": true,
+        "trafficMultiplier": 2.0
+      },
+      {
+        "from": "W",
+        "to": "Y",
+        "cost": 12,
+        "maxWeight": 20000,
+        "noHazardous": false,
+        "trafficMultiplier": 1.0
+      },
+      {
+        "from": "Y",
+        "to": "Z",
+        "cost": 12,
+        "maxWeight": 20000,
+        "noHazardous": false,
+        "trafficMultiplier": 1.0
+      },
+      {
+        "from": "W",
+        "to": "P",
+        "cost": 14,
+        "maxWeight": 20000,
+        "noHazardous": false,
+        "trafficMultiplier": 1.5
+      },
+      {
+        "from": "P",
+        "to": "Z",
+        "cost": 9,
+        "maxWeight": 20000,
+        "noHazardous": false,
+        "trafficMultiplier": 1.5
+      },
+      {
+        "from": "Z",
+        "to": "Q",
+        "cost": 6,
+        "maxWeight": 8000,
+        "noHazardous": false,
+        "trafficMultiplier": 1.2
+      },
+      {
+        "from": "Y",
+        "to": "Q",
+        "cost": 20,
+        "maxWeight": 20000,
+        "noHazardous": true,
+        "trafficMultiplier": 1.0
+      }
+    ]
+  },
+  "optimizations": [
+    {
+      "id": "N1-R1",
+      "purpose": "Light van, midday (off-peak), no constraint triggered: takes the cheapest highway route.",
+      "request": {
+        "originNodeId": "W",
+        "destinationNodeId": "Q",
+        "vehicleProfile": { "type": "van", "weight": 2000, "hazardous": false },
+        "departureTime": "12:00"
+      },
+      "expected": {
+        "solvable": true,
+        "status": "COMPLETED",
+        "path": ["W", "X", "Z", "Q"],
+        "totalCost": 24,
+        "why": "10 (W->X) + 8 (X->Z) + 6 (Z->Q). The Y bypass is 30 and the P bypass is 29."
+      }
+    },
+    {
+      "id": "N1-R2",
+      "purpose": "Heavy truck (6000 kg): the 4000 kg limit on X->Z filters out the highway, forcing a bypass.",
+      "request": {
+        "originNodeId": "W",
+        "destinationNodeId": "Q",
+        "vehicleProfile": { "type": "truck", "weight": 6000, "hazardous": false },
+        "departureTime": "12:00"
+      },
+      "expected": {
+        "solvable": true,
+        "status": "COMPLETED",
+        "path": ["W", "P", "Z", "Q"],
+        "totalCost": 29,
+        "why": "X->Z is blocked by maxWeight, and X has no other exit, so W->X is a dead end. 14 + 9 + 6 = 29 beats the Y bypass at 30."
+      }
+    },
+    {
+      "id": "N1-R3",
+      "purpose": "Hazardous load: X->Z and Y->Q both ban hazardous, so the only routes left are the two bypasses.",
+      "request": {
+        "originNodeId": "W",
+        "destinationNodeId": "Q",
+        "vehicleProfile": { "type": "truck", "weight": 3000, "hazardous": true },
+        "departureTime": "12:00"
+      },
+      "expected": {
+        "solvable": true,
+        "status": "COMPLETED",
+        "path": ["W", "P", "Z", "Q"],
+        "totalCost": 29,
+        "why": "14 + 9 + 6 = 29, cheaper than W->Y->Z->Q at 30."
+      }
+    },
+    {
+      "id": "N1-R4",
+      "purpose": "Same light van as N1-R1 but departing 08:00, inside the morning peak window: traffic multipliers change which route wins.",
+      "request": {
+        "originNodeId": "W",
+        "destinationNodeId": "Q",
+        "vehicleProfile": { "type": "van", "weight": 2000, "hazardous": false },
+        "departureTime": "08:00"
+      },
+      "expected": {
+        "solvable": true,
+        "status": "COMPLETED",
+        "path": ["W", "Y", "Z", "Q"],
+        "totalCost": 31.2,
+        "approxCost": true,
+        "why": "Highway at peak: 10*1.0 + 8*2.0 + 6*1.2 = 33.2. Y bypass: 12 + 12 + 6*1.2 = 31.2. P bypass: 21 + 13.5 + 7.2 = 41.7. Peak flips the optimum from the highway to the Y bypass."
+      }
+    },
+    {
+      "id": "N1-R5",
+      "purpose": "Heavy truck routed through waypoint X: W->X is fine, but X's only exit is the weight-blocked X->Z, so the second leg has no path.",
+      "request": {
+        "originNodeId": "W",
+        "destinationNodeId": "Q",
+        "waypoints": ["X"],
+        "vehicleProfile": { "type": "truck", "weight": 6000, "hazardous": false },
+        "departureTime": "12:00"
+      },
+      "expected": {
+        "solvable": false,
+        "status": "FAILED",
+        "errorCode": "NO_ROUTE",
+        "why": "W->Q on its own is solvable for this truck (see N1-R2), but forcing it through X makes the X->Q leg impossible because X->Z exceeds 4000 kg and X has no other outgoing edge."
+      }
+    }
+  ]
+}
