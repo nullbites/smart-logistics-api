@@ -36,9 +36,6 @@
     "generate": "prisma generate",
     "setup": "bash scripts/bootstrap.sh"
   },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
-  },
   "dependencies": {
     "@fastify/swagger": "^9.8.1",
     "@fastify/swagger-ui": "^6.1.1",
