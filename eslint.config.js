@@ -12,6 +12,16 @@ module.exports = [
       ecmaVersion: 2022,
       sourceType: 'module',
     },
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
+    },
   },
   {
     // Config files at the repo root are CommonJS scripts, not TS modules.
