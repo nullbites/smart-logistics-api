@@ -3,7 +3,7 @@ const tseslint = require('typescript-eslint');
 const prettier = require('eslint-config-prettier/flat');
 
 module.exports = [
-  { ignores: ['dist/**', 'coverage/**', 'node_modules/**'] },
+  { ignores: ['dist/**', 'coverage/**', 'node_modules/**', 'examples/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
