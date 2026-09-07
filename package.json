@@ -1,6 +1,6 @@
 {
   "name": "smart-logistics-api",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Smart Logistics API: route optimization and multi-stop pathfinding service over a Fastify + Prisma stack.",
   "private": true,
   "license": "MIT",
