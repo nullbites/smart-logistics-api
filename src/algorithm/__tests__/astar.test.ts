@@ -66,4 +66,15 @@ describe('aStar on the readme graph', () => {
   it('returns a zero-cost single-node path when origin equals destination', () => {
     expect(aStar(graph, 'A', 'A', opts())).toEqual({ path: ['A'], cost: 0 });
   });
+
+  it('reports each settled node through onExpand, ending with the goal', () => {
+    const expanded: string[] = [];
+    const result = aStar(graph, 'A', 'E', opts({ onExpand: (key) => expanded.push(key) }));
+
+    expect(result).not.toBeNull();
+    expect(expanded[0]).toBe('A');
+    expect(expanded[expanded.length - 1]).toBe('E');
+    expect(expanded.length).toBeGreaterThanOrEqual(result?.path.length ?? 0);
+    expect(new Set(expanded).size).toBe(expanded.length);
+  });
 });
