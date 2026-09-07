@@ -72,6 +72,25 @@ describe('route', () => {
     });
   });
 
+  it('visits several waypoints in the given order', async () => {
+    const outcome = await planRoute(buildReadmeGraph(), request({ waypoints: ['B', 'D'] }));
+    expect(outcome).toEqual({
+      ok: true,
+      result: { totalCost: 32, path: ['A', 'B', 'D', 'E'], hops: 3 },
+    });
+  });
+
+  it('does not reorder waypoints to make an infeasible sequence work', async () => {
+    // A can reach D (via C) and the readme graph has no D -> B edge, so the
+    // second leg fails rather than the planner rescuing it by swapping the order.
+    const outcome = await planRoute(buildReadmeGraph(), request({ waypoints: ['D', 'B'] }));
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) {
+      throw new Error('expected an error outcome');
+    }
+    expect(outcome.error.code).toBe('NO_ROUTE');
+  });
+
   it('applies peak traffic to the total cost', async () => {
     const outcome = await planRoute(buildReadmeGraph(), request({ departureTime: '08:00' }));
     const ok = expectOk(outcome);

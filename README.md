@@ -143,6 +143,26 @@ Everything above this line is the original specification and is unchanged.
 | Testing | Jest with `ts-jest` | A `unit` project for the pure algorithm and an `integration` project that runs against a real PostgreSQL test database. |
 | Tooling | `tsx`, `typescript`, `eslint` + `typescript-eslint`, `prettier`, `dotenv` | Type-checked build, linting, formatting, and `.env` loading. |
 
+### Type contracts
+
+The interfaces for nodes, edges, and the request and response payloads live in
+three places, kept separate on purpose:
+
+- `src/domain/types.ts` — the algorithm's own model: `GraphNode`, `GraphEdge`,
+  `PeakWindow`, `Graph`, `VehicleProfile`, `RouteRequest`, `RouteResult`,
+  `PathSegment`, `RouteError`, and `PlanOutcome`.
+- `src/schemas/` — the HTTP request and response DTOs, written once as TypeBox
+  schemas that serve as both the runtime validator and the static type
+  (`NodeDto`, `EdgeDto`, `UploadNetworkBody`, `PeakWindowDto`, `OptimizeBody`,
+  `VehicleProfileDto`, `StatusReply`, and the reply and parameter shapes).
+  Services take their input type from the schema, for example
+  `CreateNetworkInput = Static<typeof UploadNetworkBody>`.
+- `@prisma/client` — the persistence types (`Node`, `Edge`, `Network`, `Job`,
+  and so on) generated from `prisma/schema.prisma`.
+
+`strict` and `noUncheckedIndexedAccess` are on and `typescript-eslint` forbids
+`any`, so these contracts are enforced rather than merely documented.
+
 ### Algorithm
 
 The core routing logic lives in `src/algorithm` as pure, dependency-free functions.
