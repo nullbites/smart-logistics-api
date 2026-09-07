@@ -62,6 +62,12 @@ async function main(): Promise<void> {
 
   const networkId = network.id;
 
+  // README default peak windows: 07:00-09:00 and 17:00-19:00, in minutes of day.
+  const peakWindows = [
+    { networkId, startMinute: 420, endMinute: 540 },
+    { networkId, startMinute: 1020, endMinute: 1140 },
+  ];
+
   await prisma.$transaction([
     ...nodeKeys.map((key) =>
       prisma.node.upsert({
@@ -72,10 +78,12 @@ async function main(): Promise<void> {
     ),
     prisma.edge.deleteMany({ where: { networkId } }),
     prisma.edge.createMany({ data: edges.map((e) => ({ ...e, networkId })) }),
+    prisma.networkPeakWindow.deleteMany({ where: { networkId } }),
+    prisma.networkPeakWindow.createMany({ data: peakWindows }),
   ]);
 
   console.log(
-    `Seeded network ${networkId} (${NETWORK_NAME}): ${nodeKeys.length} nodes, ${edges.length} edges`,
+    `Seeded network ${networkId} (${NETWORK_NAME}): ${nodeKeys.length} nodes, ${edges.length} edges, ${peakWindows.length} peak windows`,
   );
 }
 

@@ -31,6 +31,7 @@ model Network {
   edges          Edge[]
   jobs           Job[]
   segmentCache   RouteSegmentCache[]
+  peakWindows    NetworkPeakWindow[]
 }
 
 model Node {
@@ -105,6 +106,16 @@ model RouteSegmentCache {
   computedAt    DateTime @default(now())
 
   @@unique([networkId, fromKey, toKey, vehicleWeight, hazardous, peak])
+}
+
+model NetworkPeakWindow {
+  id          String  @id @default(uuid())
+  network     Network @relation(fields: [networkId], references: [id], onDelete: Cascade)
+  networkId   String
+  startMinute Int
+  endMinute   Int
+
+  @@index([networkId])
 }
 
 model RequestLog {
