@@ -11,7 +11,9 @@ STAGE="release/${NAME}"
 rm -rf release "${NAME}.tar.gz"
 mkdir -p "${STAGE}/scripts" "${STAGE}/bin"
 
-cp -r dist prisma "${STAGE}/"
+# src/ is included because prisma/seed.ts (run by `prisma db seed` via tsx)
+# imports the shared client and helpers from it.
+cp -r dist prisma src "${STAGE}/"
 cp package.json package-lock.json prisma.config.ts tsconfig.json tsconfig.build.json tsconfig.seed.json docker-compose.yml .env.example README.md "${STAGE}/"
 cp bin/smart-logistics.js "${STAGE}/bin/"
 cp scripts/bootstrap.sh "${STAGE}/scripts/"

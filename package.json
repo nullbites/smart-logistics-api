@@ -1,6 +1,6 @@
 {
   "name": "smart-logistics-api",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Smart Logistics API: route optimization and multi-stop pathfinding service over a Fastify + Prisma stack.",
   "private": true,
   "license": "MIT",
@@ -65,5 +65,9 @@
     "tsx": "^4.23.13",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.69.0"
+  },
+  "overrides": {
+    "deepmerge-ts": ">=8.0.0",
+    "mysql2": ">3.23.0"
   }
 }
