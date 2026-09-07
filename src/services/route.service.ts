@@ -1,4 +1,5 @@
 import { performance } from 'node:perf_hooks';
+import type { Logger } from 'pino';
 import { aStar } from '../algorithm/astar';
 import { scaledEuclideanHeuristic, zeroHeuristic } from '../algorithm/heuristic';
 import { planRoute } from '../algorithm/route';
@@ -48,6 +49,7 @@ function makeDbSegmentResolver(
   graph: Graph,
   vehicle: RouteRequest['vehicleProfile'],
   peak: boolean,
+  log: Logger,
 ): SegmentResolver {
   const heuristic =
     graph.heuristicScale != null
@@ -55,6 +57,8 @@ function makeDbSegmentResolver(
       : zeroHeuristic;
 
   return async (fromKey, toKey) => {
+    log.debug({ fromKey, toKey }, 'resolving leg');
+
     const where = {
       networkId_fromKey_toKey_vehicleWeight_hazardous_peak: {
         networkId,
@@ -68,15 +72,28 @@ function makeDbSegmentResolver(
 
     const cached = await prisma.routeSegmentCache.findUnique({ where });
     if (cached) {
-      await prisma.routeSegmentCache.update({
+      const updated = await prisma.routeSegmentCache.update({
         where: { id: cached.id },
         data: { hitCount: { increment: 1 } },
       });
+      log.debug(
+        { fromKey, toKey, cost: cached.totalCost, hitCount: updated.hitCount },
+        'segment cache hit',
+      );
       return { path: cached.path, cost: cached.totalCost };
     }
 
-    const seg = aStar(graph, fromKey, toKey, { vehicle, peak, heuristic });
+    let expanded = 0;
+    const seg = aStar(graph, fromKey, toKey, {
+      vehicle,
+      peak,
+      heuristic,
+      onExpand: () => {
+        expanded += 1;
+      },
+    });
     if (seg === null) {
+      log.debug({ fromKey, toKey, expanded }, 'segment has no route');
       return null;
     }
 
@@ -96,11 +113,15 @@ function makeDbSegmentResolver(
       update: {},
     });
 
+    log.debug(
+      { fromKey, toKey, cost: seg.cost, hops: seg.path.length - 1, expanded },
+      'segment computed',
+    );
     return seg;
   };
 }
 
-export async function runJob(jobId: string): Promise<void> {
+export async function runJob(jobId: string, injectedLog?: Logger): Promise<void> {
   const job = await getJob(jobId);
   if (job === null) {
     return;
@@ -110,7 +131,7 @@ export async function runJob(jobId: string): Promise<void> {
   }
 
   const startedAt = performance.now();
-  const log = logger.child({ jobId });
+  const log = injectedLog ?? logger.child({ jobId });
 
   try {
     await appendLog(jobId, 'INFO', 'job started', { networkId: job.networkId });
@@ -132,7 +153,8 @@ export async function runJob(jobId: string): Promise<void> {
     }
 
     const peak = isPeak(request.departureTime, graph.peakWindows);
-    const resolver = makeDbSegmentResolver(job.networkId, graph, request.vehicleProfile, peak);
+    const resolver = makeDbSegmentResolver(job.networkId, graph, request.vehicleProfile, peak, log);
+    log.debug({ peak, waypoints: request.waypoints ?? [] }, 'planning route');
     const outcome = await planRoute(graph, request, { segmentResolver: resolver });
     const durationMs = Math.round(performance.now() - startedAt);
 

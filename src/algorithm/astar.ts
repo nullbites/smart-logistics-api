@@ -8,6 +8,8 @@ export interface AStarOptions {
   vehicle: VehicleProfile;
   peak: boolean;
   heuristic?: HeuristicFn;
+  /** Called once for each node the search settles on, so a caller can measure search effort. */
+  onExpand?: (nodeKey: string) => void;
 }
 
 interface OpenEntry {
@@ -61,6 +63,8 @@ export function aStar(
     if (entry.g > bestG) {
       continue;
     }
+
+    options.onExpand?.(entry.key);
 
     if (entry.key === toKey) {
       const path: string[] = [toKey];

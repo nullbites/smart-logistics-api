@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import pino from 'pino';
 import * as astarModule from '../../algorithm/astar';
 import { prisma } from '../../db/client';
 import type { RouteRequest } from '../../domain/types';
@@ -202,6 +203,74 @@ describe('route.service', () => {
       const rows = await prisma.routeSegmentCache.findMany({ where: { networkId } });
       expect(rows).toHaveLength(2);
       expect(rows.map((r) => r.vehicleWeight).sort((a, b) => a - b)).toEqual([3000, 6000]);
+    });
+  });
+
+  describe('verbose step logging', () => {
+    function captureLogger(): { logger: pino.Logger; lines: Array<Record<string, unknown>> } {
+      const lines: Array<Record<string, unknown>> = [];
+      const logger = pino(
+        { level: 'debug' },
+        {
+          write(chunk: string) {
+            lines.push(JSON.parse(chunk) as Record<string, unknown>);
+          },
+        },
+      );
+      return { logger, lines };
+    }
+
+    async function runWith(logger: pino.Logger, networkId: string, req: RouteRequest) {
+      const { id } = await createJob({ networkId, requestPayload: req });
+      await markRunning(id);
+      await runJob(id, logger);
+      return id;
+    }
+
+    it('emits debug lines for the plan, each leg, and the A* effort on a cache miss', async () => {
+      const networkId = await uploadReadmeNetwork();
+      const { logger, lines } = captureLogger();
+
+      await runWith(logger, networkId, request());
+
+      const messages = lines.map((l) => l.msg);
+      expect(messages).toContain('planning route');
+      expect(messages).toContain('resolving leg');
+      expect(messages).toContain('segment computed');
+
+      const computed = lines.find((l) => l.msg === 'segment computed');
+      expect(typeof computed?.expanded).toBe('number');
+      expect(computed?.expanded as number).toBeGreaterThan(0);
+    });
+
+    it('emits a cache-hit debug line on an identical second run', async () => {
+      const networkId = await uploadReadmeNetwork();
+      await runOne(networkId, request());
+
+      const { logger, lines } = captureLogger();
+      await runWith(logger, networkId, request());
+
+      const hit = lines.find((l) => l.msg === 'segment cache hit');
+      expect(hit).toBeDefined();
+      expect(hit?.hitCount).toBe(1);
+    });
+
+    it('stays quiet at info level (no debug lines)', async () => {
+      const networkId = await uploadReadmeNetwork();
+      const lines: Array<Record<string, unknown>> = [];
+      const logger = pino(
+        { level: 'info' },
+        {
+          write(chunk: string) {
+            lines.push(JSON.parse(chunk) as Record<string, unknown>);
+          },
+        },
+      );
+
+      await runWith(logger, networkId, request());
+
+      expect(lines.some((l) => l.level === 20)).toBe(false);
+      expect(lines.some((l) => l.msg === 'job completed')).toBe(true);
     });
   });
 });
