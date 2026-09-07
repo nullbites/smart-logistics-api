@@ -1,6 +1,5 @@
 export class MinHeap<T> {
   constructor(_compare: (a: T, b: T) => number) {
-    void _compare;
     throw new Error('not implemented');
   }
 
@@ -9,7 +8,6 @@ export class MinHeap<T> {
   }
 
   push(_item: T): void {
-    void _item;
     throw new Error('not implemented');
   }
 
