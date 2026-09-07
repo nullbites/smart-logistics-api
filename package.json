@@ -35,6 +35,7 @@
     "migrate:dev": "prisma migrate dev",
     "seed": "prisma db seed",
     "generate": "prisma generate",
+    "postinstall": "prisma generate",
     "setup": "bash scripts/bootstrap.sh"
   },
   "dependencies": {

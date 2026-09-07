@@ -1,0 +1,8 @@
+node_modules
+dist
+coverage
+release
+.git
+.env
+*.log
+*.tar.gz

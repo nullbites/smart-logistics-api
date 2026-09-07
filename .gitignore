@@ -143,3 +143,7 @@ dist/
 coverage/
 *.kate-swp
 .README.md.kate-swp
+
+# Release artifacts
+release/
+*.tar.gz
