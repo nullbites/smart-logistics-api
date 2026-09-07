@@ -19,6 +19,12 @@ export function isValidHhMm(value: string): boolean {
   return HHMM_RE.test(value);
 }
 
+/** Peak windows applied when a network upload omits `peakWindows` (07:00-09:00 and 17:00-19:00). */
+export const DEFAULT_PEAK_WINDOWS: ReadonlyArray<{ startMinute: number; endMinute: number }> = [
+  { startMinute: 420, endMinute: 540 },
+  { startMinute: 1020, endMinute: 1140 },
+];
+
 /** Render a minute of day (0..1439) back to "HH:MM". Throws if out of range or non-integer. */
 export function formatHhMm(minutesOfDay: number): string {
   if (!Number.isInteger(minutesOfDay) || minutesOfDay < 0 || minutesOfDay > 1439) {
