@@ -137,3 +137,13 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Project-specific ignores
+dist/
+coverage/
+*.kate-swp
+.README.md.kate-swp
+
+# Release artifacts
+release/
+*.tar.gz

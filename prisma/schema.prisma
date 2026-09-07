@@ -1,0 +1,135 @@
+// Prisma schema for the Smart Logistics Routing API.
+
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum LogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+}
+
+model Network {
+  id             String              @id @default(uuid())
+  name           String?             @unique
+  heuristicScale Float?
+  createdAt      DateTime            @default(now())
+  nodes          Node[]
+  edges          Edge[]
+  jobs           Job[]
+  segmentCache   RouteSegmentCache[]
+  peakWindows    NetworkPeakWindow[]
+}
+
+model Node {
+  id        String  @id @default(uuid())
+  network   Network @relation(fields: [networkId], references: [id], onDelete: Cascade)
+  networkId String
+  key       String
+  x         Float?
+  y         Float?
+
+  @@unique([networkId, key])
+}
+
+model Edge {
+  id                String  @id @default(uuid())
+  network           Network @relation(fields: [networkId], references: [id], onDelete: Cascade)
+  networkId         String
+  fromKey           String
+  toKey             String
+  cost              Float
+  maxWeight         Int?
+  noHazardous       Boolean @default(false)
+  trafficMultiplier Float   @default(1.0)
+
+  @@index([networkId, fromKey])
+}
+
+model Job {
+  id              String    @id
+  network         Network   @relation(fields: [networkId], references: [id], onDelete: Cascade)
+  networkId       String
+  status          JobStatus @default(PENDING)
+  requestPayload  Json
+  responsePayload Json?
+  errorCode       String?
+  errorMessage    String?
+  durationMs      Int?
+  attempts        Int       @default(0)
+  createdAt       DateTime  @default(now())
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  logs            JobLog[]
+
+  @@index([status])
+}
+
+model JobLog {
+  id      Int      @id @default(autoincrement())
+  job     Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  jobId   String
+  level   LogLevel
+  message String
+  data    Json?
+  ts      DateTime @default(now())
+
+  @@index([jobId, ts])
+}
+
+model RouteSegmentCache {
+  id            String   @id @default(uuid())
+  network       Network  @relation(fields: [networkId], references: [id], onDelete: Cascade)
+  networkId     String
+  fromKey       String
+  toKey         String
+  vehicleWeight Int
+  hazardous     Boolean
+  peak          Boolean
+  totalCost     Float
+  path          String[]
+  hops          Int
+  hitCount      Int      @default(0)
+  computedAt    DateTime @default(now())
+
+  @@unique([networkId, fromKey, toKey, vehicleWeight, hazardous, peak])
+}
+
+model NetworkPeakWindow {
+  id          String  @id @default(uuid())
+  network     Network @relation(fields: [networkId], references: [id], onDelete: Cascade)
+  networkId   String
+  startMinute Int
+  endMinute   Int
+
+  @@index([networkId])
+}
+
+model RequestLog {
+  id           Int      @id @default(autoincrement())
+  method       String
+  path         String
+  statusCode   Int
+  requestBody  Json?
+  responseBody Json?
+  jobId        String?
+  ip           String?
+  durationMs   Int?
+  createdAt    DateTime @default(now())
+
+  @@index([jobId])
+  @@index([createdAt])
+}

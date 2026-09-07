@@ -1,0 +1,159 @@
+{
+  "name": "Island delivery grid",
+  "summary": "Six nodes with no coordinates (heuristic scale is null, so A* runs as uniform-cost search) and a single custom peak window that wraps past midnight, 22:00-05:00. H->A2 carries a large night penalty; A2->C2 is capped at 3000 kg; H->B2 and B2->D2 ban hazardous loads; A2->D2 is capped at 2000 kg. K2 has an edge out to H but nothing points at it, so it is a real node that is unreachable as a destination.",
+  "upload": {
+    "peakWindows": [{ "start": "22:00", "end": "05:00" }],
+    "edges": [
+      {
+        "from": "H",
+        "to": "A2",
+        "cost": 6,
+        "maxWeight": 10000,
+        "noHazardous": false,
+        "trafficMultiplier": 3.0
+      },
+      {
+        "from": "H",
+        "to": "B2",
+        "cost": 9,
+        "maxWeight": 10000,
+        "noHazardous": true,
+        "trafficMultiplier": 1.0
+      },
+      {
+        "from": "A2",
+        "to": "C2",
+        "cost": 5,
+        "maxWeight": 3000,
+        "noHazardous": false,
+        "trafficMultiplier": 1.0
+      },
+      {
+        "from": "B2",
+        "to": "C2",
+        "cost": 7,
+        "maxWeight": 10000,
+        "noHazardous": false,
+        "trafficMultiplier": 1.0
+      },
+      {
+        "from": "C2",
+        "to": "D2",
+        "cost": 8,
+        "maxWeight": 10000,
+        "noHazardous": false,
+        "trafficMultiplier": 2.0
+      },
+      {
+        "from": "B2",
+        "to": "D2",
+        "cost": 18,
+        "maxWeight": 10000,
+        "noHazardous": true,
+        "trafficMultiplier": 1.0
+      },
+      {
+        "from": "A2",
+        "to": "D2",
+        "cost": 25,
+        "maxWeight": 2000,
+        "noHazardous": false,
+        "trafficMultiplier": 1.0
+      },
+      {
+        "from": "K2",
+        "to": "H",
+        "cost": 3,
+        "maxWeight": 10000,
+        "noHazardous": false,
+        "trafficMultiplier": 1.0
+      }
+    ]
+  },
+  "optimizations": [
+    {
+      "id": "N2-R1",
+      "purpose": "Light van, mid-morning (outside the 22:00-05:00 window): plain shortest path.",
+      "request": {
+        "originNodeId": "H",
+        "destinationNodeId": "D2",
+        "vehicleProfile": { "type": "van", "weight": 1500, "hazardous": false },
+        "departureTime": "10:00"
+      },
+      "expected": {
+        "solvable": true,
+        "status": "COMPLETED",
+        "path": ["H", "A2", "C2", "D2"],
+        "totalCost": 19,
+        "why": "6 + 5 + 8 = 19, cheaper than H->B2->C2->D2 (24), H->B2->D2 (27), and H->A2->D2 (31)."
+      }
+    },
+    {
+      "id": "N2-R2",
+      "purpose": "Same van departing 23:30, inside the wrapping night window: the H->A2 penalty (x3) and C2->D2 penalty (x2) push the route to the direct B2->D2 link.",
+      "request": {
+        "originNodeId": "H",
+        "destinationNodeId": "D2",
+        "vehicleProfile": { "type": "van", "weight": 1500, "hazardous": false },
+        "departureTime": "23:30"
+      },
+      "expected": {
+        "solvable": true,
+        "status": "COMPLETED",
+        "path": ["H", "B2", "D2"],
+        "totalCost": 27,
+        "why": "Night rates: H->A2->C2->D2 = 18 + 5 + 16 = 39; H->B2->C2->D2 = 9 + 7 + 16 = 32; H->B2->D2 = 9 + 18 = 27; H->A2->D2 = 18 + 25 = 43."
+      }
+    },
+    {
+      "id": "N2-R3",
+      "purpose": "Hazardous truck (2500 kg) at 04:00 (still inside the wrapping window): hazardous bans remove the whole B2 branch, and the 2000 kg limit removes the A2->D2 shortcut, leaving one legal path.",
+      "request": {
+        "originNodeId": "H",
+        "destinationNodeId": "D2",
+        "vehicleProfile": { "type": "truck", "weight": 2500, "hazardous": true },
+        "departureTime": "04:00"
+      },
+      "expected": {
+        "solvable": true,
+        "status": "COMPLETED",
+        "path": ["H", "A2", "C2", "D2"],
+        "totalCost": 39,
+        "why": "H->B2 bans hazardous, and A2->D2 exceeds 2000 kg, so the only route is H->A2->C2->D2. Night rates: 6*3 + 5 + 8*2 = 18 + 5 + 16 = 39."
+      }
+    },
+    {
+      "id": "N2-R4",
+      "purpose": "Waypoint that is not a node in this graph: the first leg cannot even be looked up.",
+      "request": {
+        "originNodeId": "H",
+        "destinationNodeId": "D2",
+        "waypoints": ["Z9"],
+        "vehicleProfile": { "type": "van", "weight": 1000, "hazardous": false },
+        "departureTime": "10:00"
+      },
+      "expected": {
+        "solvable": false,
+        "status": "FAILED",
+        "errorCode": "INVALID_NODE",
+        "why": "Z9 does not exist in the network, so the H->Z9 leg is rejected before any search runs."
+      }
+    },
+    {
+      "id": "N2-R5",
+      "purpose": "Destination K2 is a legitimate node (it has an edge K2->H) but nothing points at it, so it can never be reached.",
+      "request": {
+        "originNodeId": "H",
+        "destinationNodeId": "K2",
+        "vehicleProfile": { "type": "van", "weight": 1000, "hazardous": false },
+        "departureTime": "10:00"
+      },
+      "expected": {
+        "solvable": false,
+        "status": "FAILED",
+        "errorCode": "NO_ROUTE",
+        "why": "K2 has no inbound edges, so the search exhausts every reachable node without arriving at it. This is NO_ROUTE, not INVALID_NODE, because K2 is a known node."
+      }
+    }
+  ]
+}

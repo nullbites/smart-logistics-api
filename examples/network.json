@@ -1,0 +1,44 @@
+{
+  "edges": [
+    {
+      "from": "A",
+      "to": "B",
+      "cost": 10,
+      "maxWeight": 10000,
+      "noHazardous": false,
+      "trafficMultiplier": 1.0
+    },
+    {
+      "from": "A",
+      "to": "C",
+      "cost": 15,
+      "maxWeight": 5000,
+      "noHazardous": true,
+      "trafficMultiplier": 1.5
+    },
+    {
+      "from": "B",
+      "to": "D",
+      "cost": 12,
+      "maxWeight": 10000,
+      "noHazardous": false,
+      "trafficMultiplier": 2.0
+    },
+    {
+      "from": "C",
+      "to": "D",
+      "cost": 5,
+      "maxWeight": 5000,
+      "noHazardous": true,
+      "trafficMultiplier": 1.0
+    },
+    {
+      "from": "D",
+      "to": "E",
+      "cost": 10,
+      "maxWeight": 8000,
+      "noHazardous": false,
+      "trafficMultiplier": 1.2
+    }
+  ]
+}
