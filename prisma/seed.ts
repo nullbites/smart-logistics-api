@@ -1,4 +1,5 @@
 import { prisma } from '../src/db/client';
+import { DEFAULT_PEAK_WINDOWS } from '../src/lib/time';
 
 // Seeds the "Validation Example" graph documented in the project readme so the
 // published test cases can be executed against a fresh database. The script is
@@ -63,10 +64,11 @@ async function main(): Promise<void> {
   const networkId = network.id;
 
   // README default peak windows: 07:00-09:00 and 17:00-19:00, in minutes of day.
-  const peakWindows = [
-    { networkId, startMinute: 420, endMinute: 540 },
-    { networkId, startMinute: 1020, endMinute: 1140 },
-  ];
+  const peakWindows = DEFAULT_PEAK_WINDOWS.map((w) => ({
+    networkId,
+    startMinute: w.startMinute,
+    endMinute: w.endMinute,
+  }));
 
   await prisma.$transaction([
     ...nodeKeys.map((key) =>
