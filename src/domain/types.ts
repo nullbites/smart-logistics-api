@@ -13,12 +13,20 @@ export interface GraphEdge {
   trafficMultiplier?: number;
 }
 
+export interface PeakWindow {
+  /** minute of day, 0..1439 */
+  startMinute: number;
+  endMinute: number;
+}
+
 export interface Graph {
   nodes: Map<string, GraphNode>;
   /** fromKey -> outgoing edges */
   adjacency: Map<string, GraphEdge[]>;
   /** min(cost / euclideanLength) over edges; null/undefined when any edge endpoint lacks coordinates */
   heuristicScale?: number | null;
+  /** traffic multiplier windows for this network; empty means never peak */
+  peakWindows: PeakWindow[];
 }
 
 export interface VehicleProfile {

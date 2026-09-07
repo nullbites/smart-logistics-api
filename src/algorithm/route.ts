@@ -13,7 +13,7 @@ export async function planRoute(
   request: RouteRequest,
   options?: PlanRouteOptions,
 ): Promise<PlanOutcome> {
-  const peak = isPeak(request.departureTime);
+  const peak = isPeak(request.departureTime, graph.peakWindows);
   const heuristic =
     graph.heuristicScale != null
       ? scaledEuclideanHeuristic(graph.heuristicScale, graph.nodes)

@@ -79,6 +79,29 @@ describe('route', () => {
     expect(ok.result.totalCost).toBeCloseTo(39.5);
   });
 
+  it('applies no multiplier when the network defines no peak windows', async () => {
+    const outcome = await planRoute(
+      buildReadmeGraph({ peakWindows: [] }),
+      request({ departureTime: '08:00' }),
+    );
+    expect(outcome).toEqual({
+      ok: true,
+      result: { totalCost: 30, path: ['A', 'C', 'D', 'E'], hops: 3 },
+    });
+  });
+
+  it('honours a network-specific peak window', async () => {
+    const graph = buildReadmeGraph({ peakWindows: [{ startMinute: 720, endMinute: 780 }] });
+
+    const peakOutcome = await planRoute(graph, request({ departureTime: '12:30' }));
+    const peakOk = expectOk(peakOutcome);
+    expect(peakOk.result.totalCost).toBeCloseTo(39.5);
+
+    const offPeakOutcome = await planRoute(graph, request({ departureTime: '08:00' }));
+    const offPeakOk = expectOk(offPeakOutcome);
+    expect(offPeakOk.result.totalCost).toBe(30);
+  });
+
   it('treats an empty waypoints array like no waypoints', async () => {
     const outcome = await planRoute(buildReadmeGraph(), request({ waypoints: [] }));
     expect(outcome).toEqual({

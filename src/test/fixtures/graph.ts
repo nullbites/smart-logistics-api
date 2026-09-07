@@ -1,6 +1,6 @@
-import { buildGraph } from '../../domain/graph';
+import { buildGraph, type BuildGraphOptions } from '../../domain/graph';
 import { computeHeuristicScale } from '../../algorithm/heuristic';
-import type { Graph, GraphEdge, GraphNode } from '../../domain/types';
+import type { Graph, GraphEdge, GraphNode, PeakWindow } from '../../domain/types';
 
 export const readmeNodes: GraphNode[] = [
   { key: 'A' },
@@ -46,8 +46,13 @@ export const readmeEdges: GraphEdge[] = [
   },
 ];
 
-export function buildReadmeGraph(): Graph {
-  return buildGraph(readmeNodes, readmeEdges);
+export const readmePeakWindows: PeakWindow[] = [
+  { startMinute: 420, endMinute: 540 },
+  { startMinute: 1020, endMinute: 1140 },
+];
+
+export function buildReadmeGraph(overrides?: BuildGraphOptions): Graph {
+  return buildGraph(readmeNodes, readmeEdges, { peakWindows: readmePeakWindows, ...overrides });
 }
 
 export const coordNodes: GraphNode[] = [
@@ -65,5 +70,7 @@ export const coordEdges: GraphEdge[] = [
 ];
 
 export function buildCoordGraph(): Graph {
-  return buildGraph(coordNodes, coordEdges, computeHeuristicScale(coordNodes, coordEdges));
+  return buildGraph(coordNodes, coordEdges, {
+    heuristicScale: computeHeuristicScale(coordNodes, coordEdges),
+  });
 }

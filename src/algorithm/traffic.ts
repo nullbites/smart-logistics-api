@@ -1,6 +1,6 @@
-import type { GraphEdge } from '../domain/types';
+import type { GraphEdge, PeakWindow } from '../domain/types';
 
-export function isPeak(departureTime: string): boolean {
+export function isPeak(departureTime: string, windows: PeakWindow[]): boolean {
   if (!/^\d{2}:\d{2}$/.test(departureTime)) {
     throw new Error(`Invalid departureTime: ${departureTime}`);
   }
@@ -10,9 +10,11 @@ export function isPeak(departureTime: string): boolean {
   if (hours > 23 || minutes > 59) {
     throw new Error(`Invalid departureTime: ${departureTime}`);
   }
-  const minutesOfDay = hours * 60 + minutes;
-  return (
-    (minutesOfDay >= 420 && minutesOfDay < 540) || (minutesOfDay >= 1020 && minutesOfDay < 1140)
+  const t = hours * 60 + minutes;
+  return windows.some((w) =>
+    w.startMinute <= w.endMinute
+      ? t >= w.startMinute && t < w.endMinute
+      : t >= w.startMinute || t < w.endMinute,
   );
 }
 

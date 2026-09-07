@@ -1,9 +1,14 @@
-import type { Graph, GraphEdge, GraphNode } from './types';
+import type { Graph, GraphEdge, GraphNode, PeakWindow } from './types';
+
+export interface BuildGraphOptions {
+  heuristicScale?: number | null;
+  peakWindows?: PeakWindow[];
+}
 
 export function buildGraph(
   nodes: GraphNode[],
   edges: GraphEdge[],
-  heuristicScale?: number | null,
+  options?: BuildGraphOptions,
 ): Graph {
   const nodeMap = new Map<string, GraphNode>();
   for (const node of nodes) {
@@ -29,6 +34,7 @@ export function buildGraph(
   return {
     nodes: nodeMap,
     adjacency,
-    heuristicScale: heuristicScale ?? null,
+    heuristicScale: options?.heuristicScale ?? null,
+    peakWindows: options?.peakWindows ?? [],
   };
 }

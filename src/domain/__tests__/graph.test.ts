@@ -32,7 +32,26 @@ describe('buildGraph', () => {
   });
 
   it('passes heuristicScale through to the graph', () => {
-    const graph = buildGraph(readmeNodes, readmeEdges, 0.25);
+    const graph = buildGraph(readmeNodes, readmeEdges, { heuristicScale: 0.25 });
     expect(graph.heuristicScale).toBe(0.25);
+  });
+
+  it('defaults heuristicScale to null and peakWindows to an empty list', () => {
+    const graph = buildGraph(readmeNodes, readmeEdges);
+    expect(graph.heuristicScale).toBeNull();
+    expect(graph.peakWindows).toEqual([]);
+  });
+
+  it('keeps peakWindows empty when only heuristicScale is given', () => {
+    const graph = buildGraph(readmeNodes, readmeEdges, { heuristicScale: 2 });
+    expect(graph.heuristicScale).toBe(2);
+    expect(graph.peakWindows).toEqual([]);
+  });
+
+  it('passes peakWindows through to the graph', () => {
+    const graph = buildGraph(readmeNodes, readmeEdges, {
+      peakWindows: [{ startMinute: 1, endMinute: 2 }],
+    });
+    expect(graph.peakWindows).toEqual([{ startMinute: 1, endMinute: 2 }]);
   });
 });

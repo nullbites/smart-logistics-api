@@ -1,5 +1,10 @@
 import { effectiveCost, isPeak } from '../traffic';
-import type { GraphEdge } from '../../domain/types';
+import type { GraphEdge, PeakWindow } from '../../domain/types';
+
+const defaultWindows: PeakWindow[] = [
+  { startMinute: 420, endMinute: 540 },
+  { startMinute: 1020, endMinute: 1140 },
+];
 
 function edge(overrides: Partial<GraphEdge> = {}): GraphEdge {
   return {
@@ -24,7 +29,33 @@ describe('isPeak', () => {
     ['00:00', false],
     ['23:59', false],
   ])('treats %s as peak=%s', (time, expected) => {
-    expect(isPeak(time)).toBe(expected);
+    expect(isPeak(time, defaultWindows)).toBe(expected);
+  });
+
+  it('is never peak when the window list is empty', () => {
+    expect(isPeak('08:00', [])).toBe(false);
+  });
+
+  it('matches inside a single custom window (12:00-13:00)', () => {
+    const w: PeakWindow[] = [{ startMinute: 720, endMinute: 780 }];
+    expect(isPeak('12:00', w)).toBe(true);
+    expect(isPeak('12:59', w)).toBe(true);
+    expect(isPeak('13:00', w)).toBe(false);
+    expect(isPeak('08:00', w)).toBe(false);
+  });
+
+  it('matches inside a window that wraps past midnight (22:00-02:00)', () => {
+    const w: PeakWindow[] = [{ startMinute: 1320, endMinute: 120 }];
+    expect(isPeak('22:00', w)).toBe(true);
+    expect(isPeak('23:30', w)).toBe(true);
+    expect(isPeak('00:30', w)).toBe(true);
+    expect(isPeak('01:59', w)).toBe(true);
+    expect(isPeak('02:00', w)).toBe(false);
+    expect(isPeak('12:00', w)).toBe(false);
+  });
+
+  it('still throws on a malformed time', () => {
+    expect(() => isPeak('nope', defaultWindows)).toThrow('Invalid departureTime: nope');
   });
 });
 
