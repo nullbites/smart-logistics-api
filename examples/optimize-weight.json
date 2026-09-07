@@ -1,0 +1,6 @@
+{
+  "originNodeId": "A",
+  "destinationNodeId": "E",
+  "vehicleProfile": { "type": "truck", "weight": 6000, "hazardous": false },
+  "departureTime": "12:00"
+}

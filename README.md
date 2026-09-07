@@ -122,3 +122,194 @@ The expected delivery method for this project is as follows:
 4.  **Notification:** Notify the reviewer that the code is ready and providing the link to the repository or perform an invitation to your repository.
 
 ***Please DO NOT submit the code as a zip file or a Pull Request (PR) to the original repository.*** This process allows us to review your commit history and development workflow directly.
+
+---
+
+## 🛠 Implementation Notes
+
+This section documents the implementation added on top of the brief above.
+Everything above this line is the original specification and is unchanged.
+
+### Technology choices beyond the base stack
+
+| Area | Choice | Why |
+| :--- | :--- | :--- |
+| Web framework | Fastify 5 | Schema-first routing; the route schemas double as the OpenAPI source. |
+| Validation & schemas | TypeBox via `@fastify/type-provider-typebox` | One schema per route drives validation and the generated document, with static types inferred. |
+| API docs | `@fastify/swagger` + `@fastify/swagger-ui` | Generates the OpenAPI 3.1 document from the route schemas and serves Swagger UI at `/docs`. |
+| Database | PostgreSQL 16 | Persists networks, jobs, per-job logs, an audit trail, and the reusable A\* segment cache. |
+| ORM / migrations | Prisma 7 with the `@prisma/adapter-pg` driver adapter (`pg`) | Prisma 7 connects through a driver adapter; migrations and the seed command are configured in `prisma.config.ts`. |
+| Logging | Pino (`pino`, `pino-pretty`) | Structured service log to stdout; per-job log lines are also stored in the database. |
+| Testing | Jest with `ts-jest` | A `unit` project for the pure algorithm and an `integration` project that runs against a real PostgreSQL test database. |
+| Tooling | `tsx`, `typescript`, `eslint` + `typescript-eslint`, `prettier`, `dotenv` | Type-checked build, linting, formatting, and `.env` loading. |
+
+### Algorithm
+
+The core routing logic lives in `src/algorithm` as pure, dependency-free functions.
+
+- `aStar` performs A\* search over the directed graph. Node coordinates, when
+  present on the network, enable an admissible Euclidean heuristic scaled by the
+  smallest cost-per-distance ratio in the graph; without coordinates the
+  heuristic is zero and the search behaves as uniform-cost search. A\* with a
+  zero heuristic is equivalent to Dijkstra's algorithm, so the requirement is
+  satisfied either way.
+- `canTraverse` removes edges the vehicle cannot use: an edge whose `maxWeight`
+  is below the vehicle weight, or whose `noHazardous` flag conflicts with a
+  hazardous load.
+- Traffic is time-dependent. Each network defines its own peak windows (see the
+  data model); an edge inside a peak window has its `trafficMultiplier` applied.
+  The departure time is evaluated once for the whole route.
+- `planRoute` visits the origin, every waypoint in the given order, and the
+  destination, running the search for each leg and concatenating the results.
+- Each leg is resolved through a database cache (`RouteSegmentCache`), keyed by
+  the network, the two endpoints, the vehicle weight, the hazardous flag, and
+  whether the departure is in a peak window. A hit returns the stored path and
+  raises its hit count; a miss is computed and written back.
+
+### Request lifecycle and endpoints
+
+Route optimization is asynchronous.
+
+- `POST /route/optimize/{id}` validates the body, checks that network `{id}`
+  exists, stores a job with status `PENDING` and the received payload, enqueues
+  it, and returns `202` with `{ "jobId": "job-..." }`.
+- An in-process worker claims one pending job at a time (configurable with
+  `ROUTE_WORKER_CONCURRENCY`), runs it, and records the result payload, the
+  duration, and the log lines it produced. Jobs left `RUNNING` by a previous
+  process are requeued on start-up.
+- `GET /route/status/{jobId}` returns `{ "status": "PENDING" | "RUNNING" }`
+  while the job is in flight, `{ "status": "COMPLETED", "result": { "graphId",
+  "totalCost", "path", "durationMs" } }` on success, and
+  `{ "status": "FAILED", "error": { "code", "message" } }` on failure. It
+  returns `404` only for an unknown job id; the HTTP status is `200` for any
+  job that exists.
+
+Failure codes in a job result:
+
+- `INVALID_NODE` — an origin, destination, or waypoint not in the network, or
+  the network itself was not found.
+- `NO_ROUTE` — the destination is unreachable for the given vehicle and
+  constraints.
+- `INTERNAL` — an unexpected error while running the job (details in the job
+  log).
+
+Other endpoints:
+
+- `POST /network/upload` accepts `edges` and, as an extension, an optional
+  `nodes` array with `x`/`y` coordinates and an optional `peakWindows` array of
+  `{ "start": "HH:MM", "end": "HH:MM" }` ranges. A start later than its end
+  wraps past midnight. When `peakWindows` is omitted the network gets the
+  default windows `07:00`–`09:00` and `17:00`–`19:00`; an explicit empty array
+  means the network has no peak periods. Malformed times such as `26:99` or
+  `7:00` are rejected with `400`.
+- `GET /network/nodes/{id}` returns the network's nodes, including coordinates
+  when supplied.
+- `GET /docs` serves Swagger UI; `GET /docs/json` serves the raw OpenAPI
+  document.
+- `GET /health` is a liveness probe.
+
+Every request except `/health` and `/docs` is recorded in `RequestLog` with its
+method, path, status, client address, duration, and capped request and response
+bodies; a route optimization submission also stores the assigned job id on its
+audit row. All errors share the shape
+`{ "error": { "code": "...", "message": "..." } }`.
+
+### Command line usage
+
+The service is a CLI. After `npm run build`:
+
+```
+node dist/cli/index.js [serve] [options]
+```
+
+- `-h`, `--help` — print usage and exit.
+- `-V`, `--version` — print the version and exit.
+- `-v`, `--verbose` — raise the log level to debug, which adds, per optimization
+  job, the plan, each leg resolved, whether the segment was a cache hit or was
+  computed, and the number of nodes A\* expanded.
+- `-p`, `--port <n>` — port to listen on (default `3000`, or `$PORT`).
+- `-H`, `--host <addr>` — address to bind (default `0.0.0.0`, or `$HOST`).
+- `--migrate` — run `prisma migrate deploy` before starting.
+- `--seed` — run the seed before starting.
+
+The process logs the requests it receives, the results it returns, and any
+errors, and shuts the server, the worker, and the database connection down
+cleanly on `SIGINT` or `SIGTERM`.
+
+Environment variables (see `.env.example`):
+
+- `DATABASE_URL` — PostgreSQL connection string (required).
+- `DATABASE_URL_TEST` — connection string for the integration test database.
+- `PORT`, `HOST` — listen address (overridden by the flags above).
+- `VERBOSE` — `true` for debug-level logging.
+- `ROUTE_WORKER_CONCURRENCY` — jobs the worker runs at once (default `1`).
+
+### Data model
+
+All tables are in PostgreSQL and managed by the Prisma migrations in `prisma/`.
+
+- `Network` — a graph. Optional `name`, optional `heuristicScale` (the smallest
+  edge cost-per-distance ratio, set when every node has coordinates), and a
+  creation timestamp.
+- `Node` — a location in a network, identified by a `key` unique within the
+  network, with optional `x`/`y` coordinates.
+- `Edge` — a directed connection with a `cost`, an optional `maxWeight`, a
+  `noHazardous` flag, and a `trafficMultiplier`.
+- `NetworkPeakWindow` — a peak time range for a network, stored as `startMinute`
+  and `endMinute` (minutes of day); `startMinute` greater than `endMinute`
+  denotes a window that wraps past midnight.
+- `Job` — one route optimization request: the network id, the status
+  (`PENDING`, `RUNNING`, `COMPLETED`, `FAILED`), the received `requestPayload`,
+  the `responsePayload`, an `errorCode`/`errorMessage` on failure, the
+  `durationMs`, an attempt count, and lifecycle timestamps. The id has the form
+  `job-<uuid>`.
+- `JobLog` — one log line produced while a job ran: a level, a message, optional
+  structured `data`, and a timestamp, linked to its `Job`.
+- `RouteSegmentCache` — a reusable single-leg shortest path, keyed by
+  `(networkId, fromKey, toKey, vehicleWeight, hazardous, peak)`, storing the
+  `totalCost`, the `path`, the hop count, and a hit count.
+- `RequestLog` — the audit trail: method, path, status, optional bodies,
+  optional `jobId`, client address, duration, and a timestamp.
+
+`Node`, `Edge`, `NetworkPeakWindow`, `Job`, and `RouteSegmentCache` are removed
+with their `Network`; `JobLog` is removed with its `Job`.
+
+### Running from a release
+
+Each merge to `main` publishes a GitHub release with a
+`smart-logistics-api-<version>.tar.gz` archive.
+
+1. Download and extract the archive.
+2. From the extracted directory, run `bash scripts/bootstrap.sh`. It requires
+   Docker and Node.js 20 or newer, and it starts PostgreSQL, installs
+   dependencies, applies the migrations, and seeds the validation network.
+3. Start the service with `node dist/cli/index.js serve` (or `npm start`).
+
+### Building and running from source
+
+Requirements: Docker with Compose v2, and Node.js 20 or newer.
+
+```
+git clone <repository-url>
+cd smart-logistics-api
+npm run setup        # or: bash scripts/bootstrap.sh, or: make setup
+```
+
+`setup` copies `.env.example` to `.env`, starts PostgreSQL in Docker, installs
+dependencies, applies the migrations, and seeds the network from the validation
+example. Then:
+
+- `npm run dev` — start the service with reload and verbose logging.
+- `npm run build && node dist/cli/index.js serve` — start the compiled service.
+- `npm test` — run the unit and integration suites (the integration suite needs
+  the database from `setup`).
+- `npm run migrate` / `npm run seed` — apply migrations or reseed.
+- `docker compose --profile full up` — run the database and the service together
+  in containers (requires Docker BuildKit / buildx, which ships with current
+  Docker).
+
+The `Makefile` collects the same tasks (`make dev`, `make test`, `make package`,
+`make docker-build`, and so on). The `examples/` directory holds the validation
+graph (`network.json`) and matching optimization requests
+(`optimize-standard.json`, `optimize-weight.json`, `optimize-hazardous.json`)
+for a quick manual check against a running service.
