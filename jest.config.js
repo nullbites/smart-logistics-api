@@ -28,10 +28,12 @@ module.exports = {
       globalSetup: '<rootDir>/src/test/global-setup.ts',
       setupFiles: ['<rootDir>/src/test/env-setup.ts'],
       setupFilesAfterEnv: ['<rootDir>/src/test/setup.ts'],
-      maxWorkers: 1,
       clearMocks: true,
     },
   ],
   clearMocks: true,
   coverageDirectory: '<rootDir>/coverage',
+  // Single worker so the integration project's shared test database is never
+  // touched by two workers at once. maxWorkers is ignored inside a project block.
+  maxWorkers: 1,
 };
