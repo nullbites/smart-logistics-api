@@ -5,6 +5,7 @@ import { registerDocs } from './plugins/swagger';
 import { registerAuditLog } from './audit';
 import { healthRoutes } from '../routes/health';
 import { networkRoutes } from '../routes/network';
+import { routeRoutes } from '../routes/route';
 import { getJobQueue, setJobProcessor } from '../worker/queue';
 import { runJob } from '../services/route.service';
 
@@ -26,6 +27,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   registerAuditLog(app);
   await app.register(healthRoutes);
   await app.register(networkRoutes);
+  await app.register(routeRoutes);
 
   setJobProcessor(runJob);
   const queue = getJobQueue();
